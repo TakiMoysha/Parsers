@@ -1,8 +1,6 @@
 import requests
 from bs4 import BeautifulSoup as BS
 
-# -----------------------------
-# -----------------------------
 
 def writeInfo(file, name, author, pages, imageUrl, description):
     f.write(
@@ -12,11 +10,9 @@ def writeInfo(file, name, author, pages, imageUrl, description):
         'imageUrl = ' + '\"' + imageUrl + '\"' + '\n' +
         'description = ' + '\"' + description + '\"' + '\n\n'
     )
-    # f.write('name = ' + name)
     print("Done")
 
 
-# pagesInfoBook = requests.get('https://www.goodreads.com/book/show/' + bookNumber)
 def pageProcessing():
     r = requests.get("https://www.goodreads.com/choiceawards/best-fantasy-books-2019")
     html = BS(r.content, 'html.parser')
@@ -27,14 +23,8 @@ def pageProcessing():
 
 
 def getInfo(link):
-    # name = ''
-    # author = ''
-    # pages = 0
-    # imageUrl = ''
-    # description = ''
     page = requests.get(link)
     html = BS(page.content, 'html.parser')
-
     
     name = str(html.find('h1', id='bookTitle').next.strip())
     author = str(html.find('span', itemprop='name').next.strip())
