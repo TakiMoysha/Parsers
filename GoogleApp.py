@@ -1,4 +1,5 @@
 import re
+import csv
 import requests
 from bs4 import BeautifulSoup as BS
 
@@ -15,7 +16,7 @@ class GoogleApp():
 
 
     def getInstalls(self, BSClassPageApp):
-        installs = BSClassPageApp.find(string=re.compile('Installs')).next.findNext('span', {'class':'htlgb'}).next
+        installs = BSClassPageApp.find_all('div', {'class' : 'BgcNfc'})[2].next.findNext('span', {'class':'htlgb'}).findNext('span', {'class':'htlgb'}).next
         return installs
 
 
@@ -33,26 +34,25 @@ class GoogleApp():
         age = BSClassPageApp.find_all('div', {'class':'hAyfc'})[5].find('span', {'class':'htlgb'}).find('span', {'class':'htlgb'}).next.next
         return age
 
-    def writeLog(self):
+    def writeLog(self, filename):
         try:
-            f = open('log_GoogleApp.txt', 'a', encoding='1252')
-            f.write(self.nameApp + "\n")
-            for i in self.categorysApp:
-                f.write(str(i) + "; ")
-            f.write("\n")
-            f.write(str(self.installs) + "\n"
-                + str(self.numberOfReviews) + "\n"
-                + str(self.rating) + "\n"
-                + str(self.getContentRating) + "\n"
-                + str(self.link) + "\n\n")
-            f.close
+            with open(filename, "a", newline="") as file:
+                writer = csv.writer(file)
+                writer.writerows([
+                    [self.nameApp],
+                    [i for i in self.categorysApp],
+                    [self.installs],
+                    [self.numberOfReviews],
+                    [self.rating],
+                    [self.getContentRating],
+                    [self.link]
+                ])
             print("Done")
         except:
-            f.close
             print("Error")
 
 
-    def __init__(self, appLink):
+    def __init__(self, appLink, filename):
         self.link = "https://play.google.com" + appLink
         BSClassPageApp = BS(requests.get(self.link).content, 'html.parser')
         self.nameApp = GoogleApp.getNameApp(self, BSClassPageApp)
@@ -61,12 +61,13 @@ class GoogleApp():
         self.numberOfReviews = GoogleApp.getNumberOfReviews(self, BSClassPageApp)
         self.rating = GoogleApp.getRating(self, BSClassPageApp)
         self.getContentRating = GoogleApp.getContentRating(self, BSClassPageApp)
-        GoogleApp.writeLog(self)
+        GoogleApp.writeLog(self, filename)
 
 
 # --------------------------------------------------------
-limit = 5
+limit = 10
 languages = {"ru":"&hl=ru", "en":"&hl=ru"}
+filename = 'log_GoogleApp.cvs'
 # --------------------------------------------------------
 apps = []
 
@@ -76,4 +77,4 @@ html = BS(r.content, 'html.parser')
 r = requests.get(mainLink + html.select('.LkLjZd')[2].attrs['href'])
 html = BS(r.content, 'html.parser')
 htmlBlockApps = html.find_all("div", {"class": "wXUyZd"}, limit=limit)
-apps = [GoogleApp(i.next['href']) for i in htmlBlockApps]
+apps = [GoogleApp(i.next['href'], filename) for i in htmlBlockApps]
