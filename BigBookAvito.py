@@ -3,75 +3,133 @@
 # — xlrd – дает возможность читать файлы Excel
 # — xlwt – создание и заполнение файлов Excel
 # lxml библиотека для парсинга
-import requests
+import os
 import xlwt
+import xlrd
+import requests
 import lxml.html
 from lxml import etree
+from datetime import datetime
+from xlutils.copy import copy
 
 
 class Company():
     def __init__(self, link):
-        self.nameCompany = getNameCompany(self)
-        self.telephones = getTelephones(self)
-        self.address = getAddress(self)
-        self.aboutCompany = getAboutCompany(self)
-        self.siteLink = getSiteLink(self)
+        html = lxml.html.document_fromstring(requests.get(link).text).xpath("//*[@id='company_info']")[0]
+        print(link)
+        self.nameCompany = Company.initNameCompany(self, html)
+        self.heading = Company.initHeading(self, html)
+        self.telephones = Company.initTelephones(self, html)
+        self.address = Company.initAddress(self, html)
+        self.aboutCompany = Company.initDescriptionCompany(self, html)
+        self.siteLink = Company.initSiteLinks(self, html)
         self.link = link
 
     
-    def getNameCompany(self):
+    def initNameCompany(self, html):
+        return html.xpath("//*[@class='fn org']")[0].text
+
+
+    def initHeading(self, html):
         pass
 
 
-    def getTelephones(self):
-        pass
+    def initTelephones(self, html):
+        return [i.text for i in html.xpath("//*[@class='phone-item animation fly-right']/span")]
     
     
-    def getAddress(self):
-        pass
-    
-    
-    def getAboutCompany(self):
-        pass
+    def initAddress(self, html):
+        try:
+            address = html.xpath("//*[@itemprop='addressLocality']")[0].text + ' ' + html.xpath("//*[@itemprop='streetAddress']")[0].text
+        except IndexError:
+            address = "No description"
+        except:
+            address = "Unidentified error"
+        return address
     
 
-    def getSiteLink(self):
-        pass
+    def initDescriptionCompany(self, html):
+        try:
+            description = html.xpath("//*[@class='description-content']")[0].text
+        except IndexError:
+            description = "No description"
+        except:
+            description = "Unidentified error"
+        return description
+            
 
-
+    def initSiteLinks(self, html):
+        try:
+            siteLinks = [siteLink.text for siteLink in html.xpath("//*[@class='urls']/a")]
+        except IndexError:
+            siteLinks = "No links"
+        except:
+            siteLinks = "Unidentified error"
+        return siteLinks
 
 
 def main():
     mainLink = "https://moscow.big-book-avto.ru"
     sectionTrucks = "/gruzovye_avtomobili__tehnika/"
-    # //*[@id="company_info"]/div[1]/div[1]/h1/span
-    r = requests.get(mainLink + sectionTrucks).text
-    tree = lxml.html.document_fromstring(r)
-    # получить кол-во страниц
-    pages = int(tree.xpath("//*[@class='paginator']/a")[-1].text)
-    # Выцепление ссылок на компании
-    html_blocks = tree.xpath('//*[@class="catalog-item balloon_info waves-effect waves-ripple animation"]')
-    # Переход по страницам и записи каждой найденной компании в документ
-    for i in range(2, pages+1):
-        linksCompany = getLinks(html_blocks)
-        companies = [Company(mainLink + i) for i in linksCompany]
-        for i in companies:
-            writeLog(i)
+    companies = []
+    pages = int(lxml.html.document_fromstring(requests.get(mainLink + sectionTrucks).text)
+        .xpath("//*[@class='paginator']/a")[-1].text)
+    for i in range(33, pages+1): # TODO 33 -> 1
+        print("Page: " + str(i))
         r = requests.get(mainLink + sectionTrucks + "?page=" + str(i)).text
-        lxml.html.document_fromstring(r).xpath('//*[@class="catalog-item balloon_info waves-effect waves-ripple animation"]')
+        html_blocks = lxml.html.document_fromstring(r).xpath('//*[@class="catalog-item balloon_info waves-effect waves-ripple animation"]')
+        linksCompany = getLinks(html_blocks)
+        pageCompany = [Company(mainLink + companyPageHref) for companyPageHref in linksCompany]
+        companies.extend(pageCompany)
+    writeLog(companies, "log_BigBookAvito.xls")
+
 
 def getLinks(html):
+    """Принимает однотипные блоки и выцепляет ключ 'data-url'"""
     arr = []
     for i in html:
-        if str(i.get('data-url')) is 'None':
+        if str(i.get('data-url')) in 'None':
             continue
         else:
             arr.append(str(i.get('data-url')))
     return arr
 
 
-def writeLog(object):
-    pass
+def writeLog(companies, logFileName):
+    """Запись в документ информации о объекте"""
+    num = 1
+    while os.path.isfile(logFileName):
+        rb = xlrd.open_workbook(logFileName)
+        wb = copy(rb)
+        logFileName = str(num) + logFileName
+        num+=1
+    else:
+        wb = xlwt.Workbook()
+    ws = wb.add_sheet(str(datetime.date(datetime.now())))
+    # Создание разметки
+    ws.write(0, 0, 'Number')
+    ws.write(0, 1, 'Name')
+    ws.write(0, 2, 'Heading')
+    ws.write(0, 3, 'Telephone 1')
+    ws.write(0, 4, 'Telephone 2')
+    ws.write(0, 5, 'Telephone 3')  
+    ws.write(0, 6, 'Address')
+    ws.write(0, 7, 'About')
+    ws.write(0, 8, 'Site Link')
+    ws.write(0, 9, 'Link')
+    # Запись данных об объекте
+    for y in range(1, len(companies)):
+        ws.write(y, 0, y)
+        ws.write(y, 1, companies[y-1].nameCompany)
+        ws.write(y, 2, companies[y-1].heading)
+        for j in range(len(companies[y-1].telephones)):
+            ws.write(y, j+3, companies[y-1].telephones[j])
+        ws.write(y, 6, companies[y-1].address)
+        ws.write(y, 7, companies[y-1].aboutCompany)
+        ws.write(y, 8, companies[y-1].siteLink)
+        ws.write(y, 9, companies[y-1].link)
+    # Сохранение
+    wb.save(logFileName)
 
 
 if __name__ == "__main__":
