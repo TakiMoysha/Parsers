@@ -54,14 +54,11 @@ class Company():
 
     def initDescriptionCompany(self, html):
         try:
-            description = html.xpath("//*[@class='description-content']")[0].getchildren()
-            if description == []:
-                description = html.xpath("//*[@class='description-content']")[0].text
-            else:
-                text = ""
-                for i in description:
-                    text += str(i.text + "\n")
-                description = text
+            text = ""
+            description = html.xpath("//*[@class='description-content']")[0].xpath('.//text()')
+            for i in description:
+                text += i
+            description = text
         except IndexError:
             description = "No description"
         except:
@@ -85,7 +82,7 @@ def main():
     companies = []
     pages = int(lxml.html.document_fromstring(requests.get(mainLink + sectionTrucks).text)
         .xpath("//*[@class='paginator']/a")[-1].text)
-    for i in range(1, 2): # TODO 33 -> 1
+    for i in range(1, pages+1):
         print("Page: " + str(i))
         r = requests.get(mainLink + sectionTrucks + "?page=" + str(i)).text
         html_blocks = lxml.html.document_fromstring(r).xpath('//*[@class="catalog-item balloon_info waves-effect waves-ripple animation"]')
